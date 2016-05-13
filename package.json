@@ -1,0 +1,13 @@
+{
+  "name": "rpug",
+  "version": "0.1.0",
+  "description": "using pug (jade) as virtual dom",
+  "main": "index.js",
+  "dependencies": {
+    "pug-lexer": "^1.0.1",
+    "pug-parser": "^1.0.0"
+  },
+  "devDependencies": {},
+  "author": "Onne Gorter",
+  "license": "ICS"
+}
