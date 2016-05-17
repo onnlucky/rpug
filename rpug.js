@@ -36,6 +36,7 @@ function walkattrs(attrs) {
         var attr = attrs[i]
         // TODO we filter out "key" to use for the vnodes, is that wise?
         if (attr.name === "key") continue
+        if (res.length > 0) res.push(",")
         res.push(attr.name, ":")
         if (attr.mustEscape) {
             var val = attr.val
@@ -55,25 +56,25 @@ function walkattrs(attrs) {
 var keys = 1
 var code = []
 
-function key(attrs) {
+function key(attrs, dynamickey) {
     for (var i = 0; i < attrs.length; i++) {
         var attr = attrs[i]
         if (attr.name === "key") return attr.val
     }
+    if (dynamickey) return "_k"
     return String(keys++)
 }
 
-function walk(ast, n) {
+function walk(ast, n, dynamickey) {
     if (!ast) return
     n = n || 0
     switch (ast.type) {
         case "Block":
-            for (var i = 0; i < ast.nodes.length; i++) walk(ast.nodes[i], n + 1)
+            for (var i = 0; i < ast.nodes.length; i++) walk(ast.nodes[i], n + 1, dynamickey)
             break
         case "Tag":
-            // TODO walkattrs should tell us if they are static, if so, we can pre-create them, so attrs === attrs, while diffing
-            // TODO or we treat id/class/attrs seperately
-            var k = key(ast.attrs)
+            // TODO split attrs into static and dynamic attributes
+            var k = key(ast.attrs, dynamickey)
             code.push(line(n), "_h(", k, ", \"", ast.name, "\", ", walkattrs(ast.attrs), ")")
             walk(ast.block, n + 1)
             code.push(line(n), "_x(", k, ", \"/", ast.name, "\")")
@@ -103,11 +104,18 @@ function walk(ast, n) {
             }
             code.push(line(n), "}")
             break
-        case "While":
-            code.push(line(n), "while (", ast.test, ") {")
-            walk(ast.block, n + 1)
+        case "Each":
+            code.push(line(n), "for (let _k in ", ast.obj, ") {")
+            if (ast.key) code.push(line(n + 1), "let ", ast.key, " = _k;")
+            code.push(line(n + 1), "let ", ast.val, " = ", ast.obj, "[_k];")
+            walk(ast.block, n + 1, true/*dynamickey*/)
             code.push(line(n), "}")
             break
+        case "While":
+            code.push(line(n), "let _k = 0; while (", ast.test, ") { _k += 1;")
+            walk(ast.block, n + 1, true/*dynamickey*/)
+            code.push(line(n), "}")
+            break;
         default:
             throw new Error("unknown pug type: "+ ast.type)
     }

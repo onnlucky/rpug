@@ -6,15 +6,23 @@
     <script type="text/rpug">
 button(onclick=incClicks) click
 p Click count: #{clicks}
+ul
+  each val, index in collection
+    li= val
+      button(onclick=delItem,data=index) -
     </script>
     <script>
         var rpug = require("rpug")
 
+        var collection = []
         var clicks = 0
         function incClicks() {
             clicks += 1
-            rpug.update() // TODO can be removed when we wrap all callbacks
+            collection.push(collection.length + 1)
         }
-        rpug.app(function(){ return {clicks:clicks, incClicks:incClicks} })
+        function delItem(event) {
+            collection.splice(event.target.getAttribute("data"), 1)
+        }
+        rpug.app(function(){ return {clicks, incClicks, collection, delItem} })
     </script>
 </body>

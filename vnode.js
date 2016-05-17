@@ -18,6 +18,17 @@ var context = {
     nextNode: function() { var vnode = this.current.subnodes[this.iter]; return vnode? vnode.dom : null },
 }
 
+function wrapEventHandler(value) {
+    if (typeof(value) === "function") {
+        return function(event) {
+            let res = value.apply(this, arguments)
+            render()
+            return res
+        }
+    }
+    return value
+}
+
 class VNode {
     constructor(key) {
         this.key = key
@@ -32,8 +43,8 @@ class VNode {
         console.log("create tag:", this.key, tag, attrs)
         var dom = document.createElement(tag)
         for (var key in attrs) {
-            if (key === "onclick") {
-                dom.onclick = attrs[key]
+            if (key.startsWith("on")) {
+                dom[key] = wrapEventHandler(attrs[key])
                 continue
             }
             dom.setAttribute(key, attrs[key])
@@ -58,6 +69,10 @@ class VNode {
         for (var key in attrs) {
             var value = attrs[key]
             if (value === this.data[key]) continue
+            if (key.startsWith("on")) {
+                console.warn("cannot update event handlers: ", key, "on: ", dom)
+                continue
+            }
             console.log("update attr:", this.key, key, String(value))
             dom.setAttribute(key, attrs[key])
         }
@@ -102,7 +117,7 @@ function postProcess(nodes) {
         if (node.tick !== context.tick) {
             node.remove()
             nodes.splice(i, 1)
-            i -= 1
+            i -= 1; il -= 1
         }
     }
 }
@@ -128,10 +143,10 @@ function textNode(key, text) {
         return
     }
 
+    context.iter += 1
     var vnode = new VNode(key)
     vnode.createText(text)
     subnodes.splice(context.iter, 0, vnode)
-    context.iter += 1
 }
 
 function beginNode(key, tag, attrs) {
@@ -143,10 +158,10 @@ function beginNode(key, tag, attrs) {
         return
     }
 
+    context.iter += 1
     var vnode = new VNode(key)
     vnode.create(tag, attrs)
     subnodes.splice(context.iter, 0, vnode)
-    context.iter += 1
     bind(vnode)
 }
 
