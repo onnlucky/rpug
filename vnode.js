@@ -39,7 +39,7 @@ class VNode {
         this.tick = context.tick
     }
 
-    create(tag, attrs) {
+    create(tag, attrs, classes) {
         console.log("create tag:", this.key, tag, attrs)
         var dom = document.createElement(tag)
         for (var key in attrs) {
@@ -49,6 +49,7 @@ class VNode {
             }
             dom.setAttribute(key, attrs[key])
         }
+        if (classes.length > 0) { var cl = dom.classList; cl.add.apply(cl, classes) }
         this.dom = dom
         this.data = attrs
         context.parentNode().insertBefore(dom, context.nextNode())
@@ -62,7 +63,7 @@ class VNode {
         context.parentNode().insertBefore(dom, context.nextNode())
     }
 
-    update(attrs) {
+    update(attrs, classes) {
         // TODO this can be optimized a lot, like knowing properties are only changed, or even knowing which are static
         this.tick = context.tick
         var dom = this.dom
@@ -80,6 +81,19 @@ class VNode {
             if (attrs[key]) continue
             console.log("remove attr:", this.key, key)
             dom.removeAttribute(key)
+        }
+
+        var cl = dom.classList
+        if (classes.length > 0) cl.add.apply(cl, classes)
+        var l = cl.length
+        if (l !== classes.length) {
+            for (var i = 0; i < l; i++) {
+                var cls = cl.item(i)
+                if (classes.indexOf(cls) < 0) {
+                    cl.remove(cls)
+                    i -= 1; l -= 1
+                }
+            }
         }
         this.data = attrs
     }
@@ -149,18 +163,18 @@ function textNode(key, text) {
     subnodes.splice(context.iter, 0, vnode)
 }
 
-function beginNode(key, tag, attrs) {
+function beginNode(key, tag, attrs, classes) {
     var subnodes = context.current.subnodes
     var existing = findSame(subnodes, key)
     if (existing) {
-        existing.update(attrs)
+        existing.update(attrs, classes)
         bind(existing)
         return
     }
 
     context.iter += 1
     var vnode = new VNode(key)
-    vnode.create(tag, attrs)
+    vnode.create(tag, attrs, classes)
     subnodes.splice(context.iter, 0, vnode)
     bind(vnode)
 }

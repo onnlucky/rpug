@@ -29,13 +29,14 @@ var entityMap = {
 function fromEntityMap(s) { return entityMap[s] }
 function encodeHTML(text) { if (typeof(text) === "function") return text; return String(text).replace(/[&<>"'`=\/]/g, fromEntityMap) }
 
-var isStaticString = /["'][^"']*["']/
+var isStaticString = /^["'][^"']*["']$/
 function walkattrs(attrs) {
     var res = []
     for (var i = 0; i < attrs.length; i++) {
         var attr = attrs[i]
         // TODO we filter out "key" to use for the vnodes, is that wise?
         if (attr.name === "key") continue
+        if (attr.name === "class") continue
         if (res.length > 0) res.push(",")
         res.push(attr.name, ":")
         if (attr.mustEscape) {
@@ -51,6 +52,28 @@ function walkattrs(attrs) {
         }
     }
     return "{"+ res.join("") +"}"
+}
+
+function walkclass(attrs) {
+    var res = []
+    for (var i = 0; i < attrs.length; i++) {
+        var attr = attrs[i]
+        if (attr.name !== "class") continue
+        console.log(attr)
+        if (res.length > 0) res.push(",")
+        if (attr.mustEscape) {
+            var val = attr.val
+            if (val.match(isStaticString)) {
+                console.log("static string")
+                res.push(JSON.stringify(encodeHTML(eval(val))))
+            } else {
+                res.push("_e(", val, ")")
+            }
+        } else {
+            res.push(attr.val)
+        }
+    }
+    return "["+ res.join("") +"]"
 }
 
 var keys = 1
@@ -75,7 +98,7 @@ function walk(ast, n, dynamickey) {
         case "Tag":
             // TODO split attrs into static and dynamic attributes
             var k = key(ast.attrs, dynamickey)
-            code.push(line(n), "_h(", k, ", \"", ast.name, "\", ", walkattrs(ast.attrs), ")")
+            code.push(line(n), "_h(", k, ", \"", ast.name, "\", ", walkattrs(ast.attrs), ", ", walkclass(ast.attrs), ")")
             walk(ast.block, n + 1)
             code.push(line(n), "_x(", k, ", \"/", ast.name, "\")")
             break
@@ -125,6 +148,20 @@ var envnames = "_h,_x,_t,_e"
 var envfuncs = [vnode.beginNode, vnode.endNode, vnode.textNode, encodeHTML]
 var __cache = []
 var __cachefn = []
+
+function makeTemplateArgs2(locals, keys) {
+    var keys = Object.keys(locals).sort()
+    var l = keys.length
+    var args = new Array(l + 4)
+    for (var i = 0; i < 4; i++) args[i] = envfuncs[i]
+    for (var i = 0; i < l; i++) args[i + 4] = locals[keys[i]]
+    return args
+}
+
+function makeTemplateArgs(locals) {
+    return makeTemplate2(locals, Object.keys(locals).sort())
+}
+
 function makeTemplate(body) {
     return function(locals) {
         var keys = Object.keys(locals).sort()
@@ -143,16 +180,7 @@ function makeTemplate(body) {
             console.log("template cache hit:", at)
         }
 
-        // prepare arguments to the template, first 4 are for the mechanism
-        var l = keys.length
-        var args = new Array(l + 4)
-        for (var i = 0; i < 4; i++) {
-            args[i] = envfuncs[i]
-        }
-        for (var i = 0; i < l; i++) {
-            args[i + 4] = locals[keys[i]]
-        }
-        return __cachefn[at].apply(null, args)
+        return __cachefn[at].apply(null, makeTemplateArgs2(locals, keys))
     }
 }
 
@@ -163,6 +191,21 @@ function compile(text) {
     walk(ast)
     var body = code.join("")
     return makeTemplate(body)
+}
+
+function compileStatic(text, keys) {
+    var ast = parse(lex(text))
+    keys = 1
+    code = []
+    walk(ast)
+    var body = code.join("")
+
+    if (!(keys instanceof Array)) {
+        keys = Object.keys(keys)
+    }
+    keys.sort()
+    var fn1 = "function __template("+ envnames +","+ keys.join(",") +"){" + body +"\n}\n"
+    var fn2 = "function _template(locals) { return __template(makeTemplateArgs(locals)) }\n"
 }
 
 exports.compile = compile
