@@ -40,7 +40,6 @@ class VNode {
     }
 
     create(tag, attrs, classes) {
-        console.log("create tag:", this.key, tag, attrs)
         var dom = document.createElement(tag)
         for (var key in attrs) {
             if (key.startsWith("on")) {
@@ -56,7 +55,6 @@ class VNode {
     }
 
     createText(text) {
-        console.log("create text:", this.key, text)
         var dom = document.createTextNode(text)
         this.dom = dom
         this.data = text
@@ -74,12 +72,10 @@ class VNode {
                 console.warn("cannot update event handlers: ", key, "on: ", dom)
                 continue
             }
-            console.log("update attr:", this.key, key, String(value))
             dom.setAttribute(key, attrs[key])
         }
         for (var key in this.data) {
             if (attrs[key]) continue
-            console.log("remove attr:", this.key, key)
             dom.removeAttribute(key)
         }
 
@@ -101,13 +97,11 @@ class VNode {
     updateText(text) {
         this.tick = context.tick
         if (this.data === text) return
-        console.log("update text:", this.key, text)
         this.data = text
         this.dom.textContent = text
     }
 
     remove() {
-        console.log("removed:", this.key)
         this.dom.parentNode.removeChild(this.dom)
         this.dom = null
     }
@@ -185,12 +179,13 @@ function endNode(key) {
 }
 
 function render() {
+    var start = +new Date
     context.tick += 1
     context.current = context.root
     context.iter = 0
-    console.log("render start:", context.current.key)
     context.template(context.datacb())
     postProcess(context.root)
+    console.log("render:", context.tick, (+new Date) - start, "millis")
 }
 
 function setupContext(dom, template, datacb) {

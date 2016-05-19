@@ -59,12 +59,10 @@ function walkclass(attrs) {
     for (var i = 0; i < attrs.length; i++) {
         var attr = attrs[i]
         if (attr.name !== "class") continue
-        console.log(attr)
         if (res.length > 0) res.push(",")
         if (attr.mustEscape) {
             var val = attr.val
             if (val.match(isStaticString)) {
-                console.log("static string")
                 res.push(JSON.stringify(encodeHTML(eval(val))))
             } else {
                 res.push("_e(", val, ")")
@@ -121,9 +119,9 @@ function walk(ast, n, dynamickey) {
         case "Conditional":
             code.push(line(n), "if (", ast.test, ") {")
             walk(ast.consequent, n + 1)
-            if (ast.alternative) {
+            if (ast.alternate) {
                 code.push(line(n), "} else {")
-                walk(ast.alternative, n + 1)
+                walk(ast.alternate, n + 1)
             }
             code.push(line(n), "}")
             break
@@ -176,8 +174,6 @@ function makeTemplate(body) {
             var fn = new Function(envnames, key, body)
             __cachefn.push(fn)
             console.log("template created:", at, "\n", body)
-        } else {
-            console.log("template cache hit:", at)
         }
 
         return __cachefn[at].apply(null, makeTemplateArgs2(locals, keys))

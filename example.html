@@ -20,7 +20,6 @@ ul
       button(onclick=delItem,data=index) -
     </script>
     <script>
-        var rpug = require("rpug")
 
         var collection = []
         var clicks = 0
@@ -31,6 +30,8 @@ ul
         function delItem(event) {
             collection.splice(event.target.getAttribute("data"), 1)
         }
-        rpug.app(function(){ return {clicks, incClicks, collection, delItem} })
+
+        var rpug = require("rpug")
+        rpug.app(eval(rpug.init()))
     </script>
 </body>
