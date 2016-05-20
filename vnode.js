@@ -21,7 +21,7 @@ var context = {
 function wrapEventHandler(value) {
     if (typeof(value) === "function") {
         return function(event) {
-            let res = value.apply(this, arguments)
+            var res = value.apply(this, arguments)
             render()
             return res
         }
@@ -182,9 +182,10 @@ function render() {
     var start = +new Date
     context.tick += 1
     context.current = context.root
+    context.current.tick = context.tick
     context.iter = 0
     context.template(context.datacb())
-    postProcess(context.root)
+    postProcess(context.root.subnodes)
     console.log("render:", context.tick, (+new Date) - start, "millis")
 }
 

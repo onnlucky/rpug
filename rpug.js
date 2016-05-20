@@ -126,14 +126,14 @@ function walk(ast, n, dynamickey) {
             code.push(line(n), "}")
             break
         case "Each":
-            code.push(line(n), "for (let _k in ", ast.obj, ") {")
-            if (ast.key) code.push(line(n + 1), "let ", ast.key, " = _k;")
-            code.push(line(n + 1), "let ", ast.val, " = ", ast.obj, "[_k];")
+            code.push(line(n), "for (var _k in ", ast.obj, ") {")
+            if (ast.key) code.push(line(n + 1), "var ", ast.key, " = _k;")
+            code.push(line(n + 1), "var ", ast.val, " = ", ast.obj, "[_k];")
             walk(ast.block, n + 1, true/*dynamickey*/)
             code.push(line(n), "}")
             break
         case "While":
-            code.push(line(n), "let _k = 0; while (", ast.test, ") { _k += 1;")
+            code.push(line(n), "var _k = 0; while (", ast.test, ") { _k += 1;")
             walk(ast.block, n + 1, true/*dynamickey*/)
             code.push(line(n), "}")
             break;
