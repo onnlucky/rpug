@@ -1,7 +1,7 @@
 <!doctype html>
 <meta http-equiv="content-type" content="text/html; charset=utf-8">
 <title>test</title>
-<script src="bundle.js"></script>
+<script src="rpug.bundle.js"></script>
 <style>
 .bar, .foo, .test {
     background-color: pink;
@@ -20,18 +20,18 @@ ul
       button(onclick=delItem,data=index) -
     </script>
     <script>
+var collection = []
+var clicks = 0
+function incClicks() {
+    clicks += 1
+    collection.push(collection.length + 1)
+}
+function delItem(event) {
+    collection.splice(event.target.getAttribute("data"), 1)
+}
 
-        var collection = []
-        var clicks = 0
-        function incClicks() {
-            clicks += 1
-            collection.push(collection.length + 1)
-        }
-        function delItem(event) {
-            collection.splice(event.target.getAttribute("data"), 1)
-        }
-
-        var rpug = require("rpug")
-        rpug.app(eval(rpug.init()))
+var rpug = require("rpug")
+var context = rpug.context()
+context.findAndMount()
     </script>
 </body>

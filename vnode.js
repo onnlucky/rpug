@@ -1,28 +1,150 @@
 "use strict"
 
-// very simply virtual dom, pointing too, and updating the real dom
-// because these nodes come from a template, most nodes have a static unique key
-// except for list like nodes, where the template author is responsible for the uniqueness
+// Very simply virtual dom, pointing too, and updating a real dom.
+//
+// The nodes are updated using a javascript function that walks the tree for
+// nodes that are visible. But this function is compiled from a templating
+// language. That yields a few advantages:
+//
+// * all nodes have a static predefined identifier (key) except for each/while
+//   nodes, which have them created at runtime or by template author
+// * updating requires almost no memory, and no recursion
 
-// global state used
-var context = {
-    tick: 0,
-    root: null, // the root node
+var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    //"'": '&#39;',
+    //'/': '&#x2F;',
+    //'`': '&#x60;',
+    //'=': '&#x3D;'
+}
+function fromEntityMap(s) { return entityMap[s] }
+function encodeHTML(text) { if (typeof(text) === "function") return text; return String(text).replace(/[&<>"]/g, fromEntityMap) }
 
-    // working state while updating the virtual dom with dom
-    current: null,
-    iter: 0,
-    stack: [], // [{node:VNode,iter:Number}]
+// passed along while synchronizing, there will ever by only one object it is reused with clear() and set()
+class State {
+    constructor() {
+        this.context = null // Context
+        this.tick = 0
+        this.current = null // VNode
+        this.iter = 0       // VNode.subnodes index
+        this.nodestack = [] // [VNode]
+        this.iterstack = [] // [iter]
+    }
 
-    parentNode: function() { return this.current.dom },
-    nextNode: function() { var vnode = this.current.subnodes[this.iter]; return vnode? vnode.dom : null },
+    clear() {
+        this.current = null
+        this.iter = 0
+        if (this.nodestack.length) { this.nodestack.length = 0; this.iterstack.length = 0 }
+    }
+
+    set(context, current) {
+        this.context = context
+        this.tick = context.tick
+        this.current = current
+        if (this.nodestack.length) { this.nodestack.length = 0; this.iterstack.length = 0 }
+    }
+
+    push(vnode) {
+        this.nodestack.push(this.current)
+        this.iterstack.push(this.iter)
+        this.current = vnode
+        this.iter = 0
+    }
+
+    pop() {
+        this.current = this.nodestack.pop()
+        this.iter = this.iterstack.pop()
+    }
+
+    parentNode() {
+        return this.current.dom
+    }
+
+    nextNode() {
+        var vnode = this.current.subnodes[this.iter]
+        return vnode? vnode.dom : null
+    }
+}
+
+// there is only one state, it is clear()'d every time
+var _state = new State()
+
+class Context {
+    constructor() {
+        this.tick = 0
+        this.roots = []
+        this.templates = []
+    }
+
+    update() {
+        var start = +new Date
+        this.tick += 1
+        for (var i = 0, il = this.roots.length; i < il; i++) {
+            var root = this.roots[i]
+            _state.set(this, root)
+            this.templates[i](beginNode, endNode, textNode, encodeHTML)
+            postProcess(root.subnodes)
+            _state.clear()
+        }
+        console.log("rpug update:", this.tick, (+new Date) - start, "millis")
+    }
+
+    mount(where, template) {
+        if (typeof(where) === "string") {
+            where = document.getElementById(where)
+            if (!where) throw new Error("unabled to find element: "+ where)
+        }
+        if (!where) throw new Error("no mount point")
+        if (typeof(template) === "string") throw new Error("template is a string, forgot to run eval()?")
+        if (typeof(template) !== "function") throw new Error("template is not valid")
+
+        var root = new VNode(null)
+        root.dom = where
+        this.roots.push(root)
+        this.templates.push(template)
+    }
+
+    findAndMount(type) {
+        // dynamically check if we can load rpug (our 'mother' package, not "./rpug.js")
+        var rpug = window["require"]("rpug")
+        if (!rpug.compile) return
+
+        type = type || "text/rpug"
+        var scripts = document.querySelectorAll("script[type='"+ type +"']")
+
+        for (var i = 0; i < scripts.length; i++) {
+            var script = scripts[i]
+            var parent = script.parentNode
+            var dom = document.createElement("div")
+            parent.insertBefore(dom, script)
+            var text = script.textContent
+            console.log("compiling:", text)
+            var code = rpug.compile(text)
+            console.log("function:", code)
+            var template = eval(code +";_template")
+            this.mount(dom, template)
+        }
+        this.update()
+    }
+}
+
+function context() {
+    if (typeof(window) !== "undefined") {
+        if (window._rpug_context) return window._rpug_context
+        return window._rpug_context = new Context()
+    }
+    return new Context()
 }
 
 function wrapEventHandler(value) {
     if (typeof(value) === "function") {
+        var context = _state.context
         return function(event) {
             var res = value.apply(this, arguments)
-            render()
+            context.update()
             return res
         }
     }
@@ -36,7 +158,7 @@ class VNode {
         this.data = null // either the nodes text, or the nodes attrs
         this.subnodes = [] // list of sub nodes
         // to keep the tree in sync, left out nodes will fail to update their tick
-        this.tick = context.tick
+        this.tick = _state.tick
     }
 
     create(tag, attrs, classes) {
@@ -51,19 +173,19 @@ class VNode {
         if (classes.length > 0) { var cl = dom.classList; cl.add.apply(cl, classes) }
         this.dom = dom
         this.data = attrs
-        context.parentNode().insertBefore(dom, context.nextNode())
+        _state.parentNode().insertBefore(dom, _state.nextNode())
     }
 
     createText(text) {
         var dom = document.createTextNode(text)
         this.dom = dom
         this.data = text
-        context.parentNode().insertBefore(dom, context.nextNode())
+        _state.parentNode().insertBefore(dom, _state.nextNode())
     }
 
     update(attrs, classes) {
         // TODO this can be optimized a lot, like knowing properties are only changed, or even knowing which are static
-        this.tick = context.tick
+        this.tick = _state.tick
         var dom = this.dom
         for (var key in attrs) {
             var value = attrs[key]
@@ -95,7 +217,7 @@ class VNode {
     }
 
     updateText(text) {
-        this.tick = context.tick
+        this.tick = _state.tick
         if (this.data === text) return
         this.data = text
         this.dom.textContent = text
@@ -107,12 +229,12 @@ class VNode {
     }
 }
 
-// returns the node with the same key, might find reordering, will change context.iter
+// returns the node with the same key, might find reordering, will change _state.iter
 function findSame(nodes, key) {
     for (var i = 0, il = nodes.length; i < il; i++) {
         var node = nodes[i]
         if (node.key === key) {
-            if (i > context.iter) context.iter = i
+            if (i > _state.iter) _state.iter = i
             return node
         }
     }
@@ -122,7 +244,7 @@ function findSame(nodes, key) {
 function postProcess(nodes) {
     for (var i = 0, il = nodes.length; i < il; i++) {
         var node = nodes[i]
-        if (node.tick !== context.tick) {
+        if (node.tick !== _state.tick) {
             node.remove()
             nodes.splice(i, 1)
             i -= 1; il -= 1
@@ -130,75 +252,41 @@ function postProcess(nodes) {
     }
 }
 
-function bind(node) {
-    context.stack.push({node:context.current,iter:context.iter})
-    context.current = node
-    context.iter = 0
-}
-
-function unbind(node) {
-    postProcess(node.subnodes)
-    var s = context.stack.pop()
-    context.current = s.node
-    context.iter = s.iter
-}
-
 function textNode(key, text) {
-    var subnodes = context.current.subnodes
+    var subnodes = _state.current.subnodes
     var existing = findSame(subnodes, key)
     if (existing) {
         existing.updateText(text)
         return
     }
 
-    context.iter += 1
+    _state.iter += 1
     var vnode = new VNode(key)
     vnode.createText(text)
-    subnodes.splice(context.iter, 0, vnode)
+    subnodes.splice(_state.iter, 0, vnode)
 }
 
 function beginNode(key, tag, attrs, classes) {
-    var subnodes = context.current.subnodes
+    var subnodes = _state.current.subnodes
     var existing = findSame(subnodes, key)
     if (existing) {
         existing.update(attrs, classes)
-        bind(existing)
+        _state.push(existing)
         return
     }
 
-    context.iter += 1
+    _state.iter += 1
     var vnode = new VNode(key)
     vnode.create(tag, attrs, classes)
-    subnodes.splice(context.iter, 0, vnode)
-    bind(vnode)
+    subnodes.splice(_state.iter, 0, vnode)
+    _state.push(vnode)
 }
 
 function endNode(key) {
-    //assert(context.current.key === key)
-    unbind(context.current)
+    postProcess(_state.current.subnodes)
+    _state.pop()
 }
 
-function render() {
-    var start = +new Date
-    context.tick += 1
-    context.current = context.root
-    context.current.tick = context.tick
-    context.iter = 0
-    context.template(context.datacb())
-    postProcess(context.root.subnodes)
-    console.log("render:", context.tick, (+new Date) - start, "millis")
-}
-
-function setupContext(dom, template, datacb) {
-    context.template = template
-    context.datacb = datacb
-    context.root = new VNode(0)
-    context.root.dom = dom
-}
-
-exports.textNode = textNode
-exports.beginNode = beginNode
-exports.endNode = endNode
-exports.render = render
-exports.setupContext = setupContext
+exports.encodeHTML = encodeHTML
+exports.context = context
 

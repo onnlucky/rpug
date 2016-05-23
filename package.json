@@ -1,7 +1,7 @@
 {
   "name": "rpug",
   "version": "0.1.0",
-  "description": "using pug (jade) as virtual dom",
+  "description": "client side, auto updating, pug templates",
   "main": "index.js",
   "dependencies": {
     "pug-lexer": "^1.0.1",

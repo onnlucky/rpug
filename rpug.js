@@ -2,7 +2,7 @@
 
 var lex = require("pug-lexer")
 var parse = require("pug-parser")
-var vnode = require("./vnode.js")
+var encodeHTML = require("./vnode.js").encodeHTML
 
 // templates from pug
 
@@ -16,20 +16,8 @@ function line(n) {
     return "\n" + indent(n)
 }
 
-var entityMap = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-    '/': '&#x2F;',
-    '`': '&#x60;',
-    '=': '&#x3D;'
-}
-function fromEntityMap(s) { return entityMap[s] }
-function encodeHTML(text) { if (typeof(text) === "function") return text; return String(text).replace(/[&<>"'`=\/]/g, fromEntityMap) }
-
 var isStaticString = /^["'][^"']*["']$/
+
 function walkattrs(attrs) {
     var res = []
     for (var i = 0; i < attrs.length; i++) {
@@ -142,67 +130,15 @@ function walk(ast, n, dynamickey) {
     }
 }
 
-var envnames = "_h,_x,_t,_e"
-var envfuncs = [vnode.beginNode, vnode.endNode, vnode.textNode, encodeHTML]
-var __cache = []
-var __cachefn = []
-
-function makeTemplateArgs2(locals, keys) {
-    var keys = Object.keys(locals).sort()
-    var l = keys.length
-    var args = new Array(l + 4)
-    for (var i = 0; i < 4; i++) args[i] = envfuncs[i]
-    for (var i = 0; i < l; i++) args[i + 4] = locals[keys[i]]
-    return args
-}
-
-function makeTemplateArgs(locals) {
-    return makeTemplate2(locals, Object.keys(locals).sort())
-}
-
-function makeTemplate(body) {
-    return function(locals) {
-        var keys = Object.keys(locals).sort()
-        var key = keys.join(",") // TODO can we elide creating this string?
-        var at = __cache.indexOf(key)
-        if (at < 0) {
-            if (keys.indexOf("_h") >= 0 || keys.indexOf("_t") >= 0 || keys.indexOf("_x") >= 0 || keys.indexOf("_e") >= 0) {
-                throw new Error("cannot use locals called _h, _t, _x or _e")
-            }
-            at = __cache.length
-            __cache.push(key)
-            var fn = new Function(envnames, key, body)
-            __cachefn.push(fn)
-            console.log("template created:", at, "\n", body)
-        }
-
-        return __cachefn[at].apply(null, makeTemplateArgs2(locals, keys))
-    }
-}
-
-function compile(text) {
+function compile(text, keys) {
     var ast = parse(lex(text))
     keys = 1
     code = []
     walk(ast)
     var body = code.join("")
-    return makeTemplate(body)
+    return "function _template(_h, _x, _t, _e) {"+ body +"\n}"
 }
 
-function compileStatic(text, keys) {
-    var ast = parse(lex(text))
-    keys = 1
-    code = []
-    walk(ast)
-    var body = code.join("")
-
-    if (!(keys instanceof Array)) {
-        keys = Object.keys(keys)
-    }
-    keys.sort()
-    var fn1 = "function __template("+ envnames +","+ keys.join(",") +"){" + body +"\n}\n"
-    var fn2 = "function _template(locals) { return __template(makeTemplateArgs(locals)) }\n"
-}
-
+exports.encodeHTML = encodeHTML
 exports.compile = compile
 
