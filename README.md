@@ -3,7 +3,57 @@
 * author: Onne Gorter
 * licence: CC0
 
+Use pug[1] templates as a self updating virtual dom. Much like facebooks react[2].
+
+Minimal example:
+```
+title rpug demo
+script(src="node_modules/rpug/rpug_runtime.bundle.js")
+p Some normal pug template
+script.
+  // javascript app
+  var clicks = 0
+  function addclick() { clicks += 1}
+  // must be done before any :rpug statement
+  require("rpug").context()
+:rpug
+  p Reactive pug template here.
+  p You clicked #{clicks} times.
+  button(onclick=addclick) click me!
+```
+
+```
+$ npm install -g pug
+$ npm install rpug jstransformer-rpug
+$ pug example.pug
+$ open example.html
+```
+
+[1] http://jade-lang.com
+[2] http://facebook.github.io/react/
+
+
+## work in progress
+
+It works for what I use it for. But it can use some optimizations.
+
+### TODO
+* precompiled templates should nor require rpug to have loaded already
+* context.update() should schedule update, not immediately trigger one
+* optimize static properties vs dynamic properties, easy enough to do from pug
+* pass along the virtual node, so you can do things like
+  `vnode.hold(deep=false: Bool)` to prevent updates for a while
+* find vnode.key faster, and postProcess faster
+* stop using node.classList, it is a horrible interface
+* optimize certain patterns, like `p Hello` does not need _t(p); _t("Hello"); _x();
+* optmize static parts of the tree, no need to run down a tree when we know it can only
+  appear/disappear, never change
+* animations
+* do rpug_runtime.js, no require, no classes, as minimalist as possible
+
 ## notes
+
+Use the actual dom as a read-only source, that is perfectly fine pattern.
 
 Event handlers are set only once. Creating closures in the template is just
 wasting resources, and likely will not do what you expect. To pass in extra
@@ -41,61 +91,3 @@ function handler(event) {
 }
 ```
 
-## example
-
-```javascript
-// create app
-var counter = 0
-var collection = ["Apples", "Bananas", "Coconuts", "Dades"]
-
-// an event handler, app will update automatically
-function increment() {
-    counter += 1
-}
-
-// event handlers receive normal dom events
-// and you can use the dom in a read-only manner
-function add(event) {
-    var input = document.getElementById("name")
-    var name = input.textValue
-    input.textValue = ""
-    collection.push(name)
-}
-
-// if you add extra properties to the dom node, you can get those back
-function remove(event) {
-    var index = Number(event.target.getAttribute("data"))
-    collection.splice(index, 1)
-}
-
-// start the rpug virtual dom by importing and creating a context
-var rpug = require("rpug")
-var context = rpug.context()
-
-// mount a template, if not precompiled, needs to go through eval()
-context.mount("rootid", eval(rpug.compile(`
-button(onclick=increment)= counter
-
-input#name(type=text,placeholder="item)
-button(onclick=add)
-ul
-  each val, index in collection
-    li val
-      button(onclick=remove,data=index) -
-`)))
-
-// any updates to the app data outside of event handlers will need to call context.update()
-setTimeout(function() {
-    counter = 999
-    context.update()
-}, 5000)
-
-// any precompiled script will result in code something like this:
-//<div id="_rpug123")
-//<script>
-//window._rpug_context.mount(document.getElementById("_rpug123"), function(_h, _x, _t, _e) {
-// ... lots of template code ...
-//})
-//</script>
-// if all scripts are precompiled you only need rpug_runtime.min.js
-```

@@ -88,6 +88,7 @@ class Context {
     }
 
     update() {
+        // TODO this should be postponed, or at least check for recursion
         var start = +new Date
         this.tick += 1
         for (var i = 0, il = this.roots.length; i < il; i++) {
@@ -113,6 +114,7 @@ class Context {
         root.dom = where
         this.roots.push(root)
         this.templates.push(template)
+        this.update()
     }
 
     findAndMount(type) {
