@@ -6,5 +6,8 @@ rpug.bundle.js: index.js vnode.js rpug.js Makefile
 rpug_runtime.bundle.js: vnode.js Makefile
 	browserify -r ./vnode.js:rpug > $@
 
+clean:
+	rm -f *.bundle.js *.bundle.min.js
+
 run:
 	node index.js

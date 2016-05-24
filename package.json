@@ -1,7 +1,7 @@
 {
   "name": "rpug",
   "version": "0.1.0",
-  "description": "client side, auto updating, pug templates",
+  "description": "Reactive client side pug templates.",
   "main": "index.js",
   "dependencies": {
     "pug-lexer": "^1.0.1",
@@ -9,5 +9,5 @@
   },
   "devDependencies": {},
   "author": "Onne Gorter",
-  "license": "ICS"
+  "license": "CC0"
 }

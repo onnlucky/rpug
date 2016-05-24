@@ -1,4 +1,7 @@
-# rpug - client side, auto updating, pug templates
+# rpug - Reactive client side pug templates.
+
+* author: Onne Gorter
+* licence: CC0
 
 ```javascript
 // create app
@@ -50,7 +53,7 @@ setTimeout(function() {
 // any precompiled script will result in code something like this:
 //<div id="_rpug123")
 //<script>
-//_rpug_context.mount(document.getElementById("_rpug123"), function(_h, _x, _t, _e) {
+//window._rpug_context.mount(document.getElementById("_rpug123"), function(_h, _x, _t, _e) {
 // ... lots of template code ...
 //})
 //</script>
