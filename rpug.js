@@ -26,7 +26,7 @@ function walkattrs(attrs) {
         if (attr.name === "key") continue
         if (attr.name === "class") continue
         if (res.length > 0) res.push(",")
-        res.push(attr.name, ":")
+        res.push("\"", attr.name, "\":")
         if (attr.mustEscape) {
             var val = attr.val
             // if it looks like a plain string, aka, "test", then no need to runtime encode that html

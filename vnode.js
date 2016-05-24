@@ -10,6 +10,14 @@
 //   nodes, which have them created at runtime or by template author
 // * updating requires almost no memory, and no recursion
 
+// run eval in an empty environment
+// not, eval itself will have access to all javascript globals
+var _evalfn = null
+function minimalEval(text) {
+    if (!_evalfn) _evalfn = new Function("__t", "return eval(__t)")
+    return _evalfn(text)
+}
+
 var entityMap = {
     '&': '&amp;',
     '<': '&lt;',
@@ -124,7 +132,7 @@ class Context {
             console.log("compiling:", text)
             var code = rpug.compile(text)
             console.log("function:", code)
-            var template = eval(code +";_template")
+            var template = minimalEval(code +";_template")
             this.mount(dom, template)
         }
         this.update()
@@ -151,6 +159,19 @@ function wrapEventHandler(value) {
     return value
 }
 
+function wrapBindHandler(value, vnode) {
+    if (typeof(value) === "function") {
+        var context = _state.context
+        return function(event) {
+            var res = value.apply(this, arguments)
+            vnode.tick = context.tick + 1
+            context.update()
+            return res
+        }
+    }
+    return value
+}
+
 class VNode {
     constructor(key) {
         this.key = key
@@ -165,7 +186,15 @@ class VNode {
         var dom = document.createElement(tag)
         for (var key in attrs) {
             if (key.startsWith("on")) {
+                if (key.endsWith("-bind")) {
+                    dom[key.slice(0, -5)] = wrapBindHandler(attrs[key], this)
+                    continue
+                }
                 dom[key] = wrapEventHandler(attrs[key])
+                continue
+            }
+            if (key === "value") {
+                dom.value = attrs[key]
                 continue
             }
             dom.setAttribute(key, attrs[key])
@@ -176,14 +205,11 @@ class VNode {
         _state.parentNode().insertBefore(dom, _state.nextNode())
     }
 
-    createText(text) {
-        var dom = document.createTextNode(text)
-        this.dom = dom
-        this.data = text
-        _state.parentNode().insertBefore(dom, _state.nextNode())
-    }
-
     update(attrs, classes) {
+        // bind=handler will update the tick, so we don't update the bound element
+        if (this.tick == _state.tick) return
+        if (this.tick > _state.tick) console.log("warning: tick too large:", this.tick, _state.tick)
+
         // TODO this can be optimized a lot, like knowing properties are only changed, or even knowing which are static
         this.tick = _state.tick
         var dom = this.dom
@@ -191,7 +217,11 @@ class VNode {
             var value = attrs[key]
             if (value === this.data[key]) continue
             if (key.startsWith("on")) {
-                console.warn("cannot update event handlers: ", key, "on: ", dom)
+                console.warn("cannot update event handlers: ", key, "for: ", dom)
+                continue
+            }
+            if (key === "value") {
+                dom.value = attrs[key]
                 continue
             }
             dom.setAttribute(key, attrs[key])
@@ -214,6 +244,13 @@ class VNode {
             }
         }
         this.data = attrs
+    }
+
+    createText(text) {
+        var dom = document.createTextNode(text)
+        this.dom = dom
+        this.data = text
+        _state.parentNode().insertBefore(dom, _state.nextNode())
     }
 
     updateText(text) {

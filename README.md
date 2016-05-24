@@ -3,6 +3,46 @@
 * author: Onne Gorter
 * licence: CC0
 
+## notes
+
+Event handlers are set only once. Creating closures in the template is just
+wasting resources, and likely will not do what you expect. To pass in extra
+data, place those on the dom, e.g.:
+
+```
+a(onclick=handler,data="somedata") test
+```
+```javascript
+function handler(event) {
+    var data = event.target.getAttribute("data")
+    // do stuff
+}
+```
+
+Some attributes are handled specially: `key`, `value`, `on*`, `on*-bind`
+
+* `key`, specifically sets the vnode identifier, so it is unambigous when an
+  element has moved or disappeared. The framework creates these automatically,
+  but for lists (`each`, `while`), it is recommended to use. Otherwise the key
+  will be its position.
+* `value`, `on*`, all attributes are set using node.setAttribute(), except for
+  `value` and event handlers. Plus event handlers get wrapped to trigger
+  updates, and set only once.
+* `on*-bind`, when postfixing an event handler with -bind, when it fires
+  it will skip one update. Useful for native input elements.
+
+```
+input(oninput-bind=handler,value=text)
+```
+```javascript
+var text = "lorem ipsum"
+function handler(event) {
+    text = event.target.value
+}
+```
+
+## example
+
 ```javascript
 // create app
 var counter = 0

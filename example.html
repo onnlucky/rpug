@@ -18,6 +18,11 @@ ul
   each val, index in collection
     li= val
       button(onclick=delItem,data=index) -
+br
+
+input(type="text",oninput-bind=ontext,value=text)
+input(type="text",oninput-bind=ontext,value=text)
+p= text
     </script>
     <script>
 var collection = []
@@ -28,6 +33,11 @@ function incClicks() {
 }
 function delItem(event) {
     collection.splice(event.target.getAttribute("data"), 1)
+}
+
+var text = "Lorem ipsum"
+function ontext(event) {
+    text = event.target.value
 }
 
 var rpug = require("rpug")
