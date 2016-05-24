@@ -15,5 +15,5 @@ exports.precompile = function(text, id) {
     }
     return "<div id=\""
            + id +"\"></div><script>\nwindow._rpug_context.mount(document.getElementById(\""
-           + id +"\"), " + rpug.compile(text) +"</script>\n"
+           + id +"\"), " + rpug.compile(text) +")\n</script>\n"
 }
